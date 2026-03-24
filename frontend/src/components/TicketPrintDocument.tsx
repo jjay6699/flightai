@@ -40,16 +40,16 @@ export default function TicketPrintDocument({
   type: "bundle" | "boarding_passes" | "itinerary";
 }) {
   return (
-    <div className="mx-auto flex w-[794px] flex-col gap-6 bg-white py-4">
+    <div className="bg-white">
       {(type === "bundle" || type === "boarding_passes") && (
-        <div className="space-y-6">
+        <div>
           {segments.map((segment, index) => (
             <div
               key={`${segment.carrierCode}-${segment.flightNumber}-${index}`}
               data-print-page
-              className="flex h-[1123px] w-[794px] items-center justify-center bg-white px-6 py-8"
+              className="flex h-[794px] w-[1123px] items-center justify-center bg-white px-10 py-8"
             >
-              <div className="w-full">
+              <div className="w-full scale-[1.02]">
                 <BoardingPassCard
                   label={passes[index]?.label ?? (index === 0 ? "Departure" : "Return")}
                   segment={segment}

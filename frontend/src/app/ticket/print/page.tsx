@@ -141,21 +141,34 @@ function TicketPrintPageContent() {
   return (
     <main className="min-h-screen bg-white">
       <style jsx global>{`
-        @page {
-          size: A4;
+        @page boarding {
+          size: A4 landscape;
+          margin: 0;
+        }
+        @page itinerary {
+          size: A4 portrait;
           margin: 0;
         }
         html, body {
           background: #ffffff;
+          margin: 0;
+          padding: 0;
         }
         [data-print-page] {
+          page: boarding;
           break-after: page;
           page-break-after: always;
+          break-inside: avoid;
         }
         [data-itinerary-page] {
+          page: itinerary;
           break-after: page;
           page-break-after: always;
+          break-inside: avoid;
           box-shadow: none !important;
+        }
+        [data-print-ready="true"] {
+          background: #ffffff;
         }
       `}</style>
 

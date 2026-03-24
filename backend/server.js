@@ -5,6 +5,7 @@ const Stripe = require('stripe');
 const axios = require('axios');
 const { getJson } = require('serpapi');
 const { chromium } = require('playwright');
+const { PDFDocument } = require('pdf-lib');
 
 dotenv.config();
 
@@ -39,6 +40,38 @@ function cleanupTicketPayloads() {
 function getTicketPayload(bookingRef) {
   cleanupTicketPayloads();
   return ticketPayloadStore.get(bookingRef);
+}
+
+async function captureRenderedPages(page, selector) {
+  const locator = page.locator(selector);
+  const count = await locator.count();
+  const images = [];
+
+  for (let index = 0; index < count; index += 1) {
+    images.push(await locator.nth(index).screenshot({ type: 'png' }));
+  }
+
+  return images;
+}
+
+async function appendImagesAsPdfPages(pdfDoc, images, pageSize) {
+  const [pageWidth, pageHeight] = pageSize;
+
+  for (const imageBuffer of images) {
+    const image = await pdfDoc.embedPng(imageBuffer);
+    const page = pdfDoc.addPage(pageSize);
+    const scale = Math.min(pageWidth / image.width, pageHeight / image.height);
+    const renderWidth = image.width * scale;
+    const renderHeight = image.height * scale;
+    const x = (pageWidth - renderWidth) / 2;
+    const y = (pageHeight - renderHeight) / 2;
+    page.drawImage(image, {
+      x,
+      y,
+      width: renderWidth,
+      height: renderHeight
+    });
+  }
 }
 
 // Middleware
@@ -362,22 +395,28 @@ app.get('/api/download/:sessionId', async (req, res) => {
       viewport: { width: 794, height: 1123 },
       deviceScaleFactor: 2
     });
-    const printUrl = `${frontendBaseUrl}/ticket/print?sessionId=${encodeURIComponent(req.params.sessionId)}&bookingRef=${encodeURIComponent(String(bookingRef))}&type=${encodeURIComponent(normalizedType)}`;
-    await page.goto(printUrl, { waitUntil: 'networkidle' });
-    await page.waitForSelector('[data-print-ready="true"]', { timeout: 45000 });
-    await page.waitForTimeout(800);
+    const buildPrintUrl = (renderType) =>
+      `${frontendBaseUrl}/ticket/print?sessionId=${encodeURIComponent(req.params.sessionId)}&bookingRef=${encodeURIComponent(String(bookingRef))}&type=${encodeURIComponent(renderType)}`;
 
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      preferCSSPageSize: true,
-      margin: {
-        top: '0',
-        right: '0',
-        bottom: '0',
-        left: '0'
-      }
-    });
+    const pdfDoc = await PDFDocument.create();
+
+    if (normalizedType === 'boarding_passes' || normalizedType === 'bundle') {
+      await page.goto(buildPrintUrl('boarding_passes'), { waitUntil: 'networkidle' });
+      await page.waitForSelector('[data-print-ready="true"]', { timeout: 45000 });
+      await page.waitForTimeout(500);
+      const boardingImages = await captureRenderedPages(page, '[data-print-page]');
+      await appendImagesAsPdfPages(pdfDoc, boardingImages, [841.89, 595.28]);
+    }
+
+    if (normalizedType === 'itinerary' || normalizedType === 'bundle') {
+      await page.goto(buildPrintUrl('itinerary'), { waitUntil: 'networkidle' });
+      await page.waitForSelector('[data-print-ready="true"]', { timeout: 45000 });
+      await page.waitForTimeout(500);
+      const itineraryImages = await captureRenderedPages(page, '[data-itinerary-page]');
+      await appendImagesAsPdfPages(pdfDoc, itineraryImages, [595.28, 841.89]);
+    }
+
+    const pdfBuffer = await pdfDoc.save();
 
     const suffix = normalizedType === 'bundle' ? 'ticket-pack' : normalizedType;
     res.setHeader('Content-Type', 'application/pdf');

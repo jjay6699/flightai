@@ -16,7 +16,15 @@ import {
 } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import { FlightOffer, PassengerDetails, FlightSegment, PurchaseType } from "@/lib/types";
-import { loadPassenger, loadSelectedDeparture, loadSelectedReturn, clearSession, loadBookingEntitlement, saveBookingEntitlement } from "@/lib/storage";
+import {
+  loadPassenger,
+  loadSelectedDeparture,
+  loadSelectedReturn,
+  clearSession,
+  loadBookingEntitlement,
+  saveBookingEntitlement,
+  removeBookingEntitlement
+} from "@/lib/storage";
 import { formatDate, formatTime, generateBoardingTime, generateSeat } from "@/lib/flight-utils";
 import BoardingPassCard from "@/components/BoardingPassCard";
 import ItineraryDocument from "@/components/ItineraryDocument";
@@ -139,15 +147,6 @@ export default function TicketPage() {
     setDeparture(selectedDeparture);
     setReturn(selectedReturn);
     setPassenger(passengerData);
-    const existingEntitlement = loadBookingEntitlement(passengerData.bookingRef);
-    if (existingEntitlement) {
-      setEntitlement({
-        boardingPasses: existingEntitlement.boardingPasses,
-        itinerary: existingEntitlement.itinerary,
-        lastSessionId: existingEntitlement.lastSessionId || ""
-      });
-    }
-
     const segments: FlightSegment[] = [selectedDeparture.segments[0]];
     if (selectedReturn?.segments[0]) {
       segments.push(selectedReturn.segments[0]);
@@ -250,6 +249,52 @@ export default function TicketPage() {
         window.history.replaceState({}, "", "/ticket");
       });
   }, [departure, passenger]);
+
+  useEffect(() => {
+    if (!passenger) return;
+
+    const sessionIdFromUrl = new URLSearchParams(window.location.search).get("session_id");
+    if (sessionIdFromUrl) return;
+
+    const existingEntitlement = loadBookingEntitlement(passenger.bookingRef);
+    if (!existingEntitlement?.lastSessionId) {
+      setEntitlement({
+        boardingPasses: false,
+        itinerary: false,
+        lastSessionId: ""
+      });
+      return;
+    }
+
+    fetch(
+      `/api/payments/verify-payment/${encodeURIComponent(existingEntitlement.lastSessionId)}?bookingRef=${encodeURIComponent(passenger.bookingRef)}`,
+      { cache: "no-store" }
+    )
+      .then(async (res) => {
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok || !payload.success) {
+          throw new Error(payload.error || "Cached payment verification failed");
+        }
+        return payload;
+      })
+      .then((payload) => {
+        const nextEntitlement = {
+          boardingPasses: Boolean(payload.access?.boardingPasses),
+          itinerary: Boolean(payload.access?.itinerary),
+          lastSessionId: existingEntitlement.lastSessionId || ""
+        };
+        setEntitlement(nextEntitlement);
+        saveBookingEntitlement(passenger.bookingRef, nextEntitlement);
+      })
+      .catch(() => {
+        removeBookingEntitlement(passenger.bookingRef);
+        setEntitlement({
+          boardingPasses: false,
+          itinerary: false,
+          lastSessionId: ""
+        });
+      });
+  }, [passenger]);
 
   useEffect(() => {
     if (!departure || !passenger) return;

@@ -106,3 +106,10 @@ export function saveBookingEntitlement(bookingRef: string, entitlement: Partial<
   };
   localStorage.setItem(entitlementKey, JSON.stringify(all));
 }
+
+export function removeBookingEntitlement(bookingRef: string) {
+  if (typeof window === "undefined" || !bookingRef) return;
+  const all = loadEntitlementMap();
+  delete all[bookingRef];
+  localStorage.setItem(entitlementKey, JSON.stringify(all));
+}

@@ -5,16 +5,10 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, PlaneTakeoff } from "lucide-react";
 import FlightCard from "@/components/FlightCard";
 import FlightSkeleton from "@/components/FlightSkeleton";
+import { footerLinks } from "@/lib/footer-links";
 import { FlightOffer } from "@/lib/types";
 import { saveSelectedDeparture, saveSelectedReturn, clearSelectedReturn } from "@/lib/storage";
 import { cacheLogoFromApi } from "@/lib/logo-cache";
-
-const footerLinks = [
-  "Privacy Policy",
-  "Terms of Carriage",
-  "International Visas",
-  "GDPR Compliance"
-];
 
 export default function SearchPage() {
   return (
@@ -288,11 +282,11 @@ function SearchPageContent() {
           <div className="flex flex-wrap justify-center gap-6">
             {footerLinks.map((link) => (
               <a
-                key={link}
+                key={link.href}
                 className="font-label text-xs uppercase tracking-[0.14em] text-slate-500 underline underline-offset-4 transition-colors hover:text-slate-800"
-                href="#"
+                href={link.href}
               >
-                {link}
+                {link.label}
               </a>
             ))}
           </div>

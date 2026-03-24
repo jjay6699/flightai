@@ -21,6 +21,7 @@ import BoardingPassCard from "@/components/BoardingPassCard";
 import ItineraryDocument from "@/components/ItineraryDocument";
 import { cacheLogoFromApi, getCachedLogo } from "@/lib/logo-cache";
 import { fetchAirlineMeta } from "@/lib/airline-meta";
+import { footerLinks } from "@/lib/footer-links";
 
 const pxToPt = 0.75;
 const a4WidthPt = 595.28;
@@ -48,13 +49,6 @@ type SegmentMeta = {
   departureAirport?: AirportNames | null;
   arrivalAirport?: AirportNames | null;
 };
-
-const footerLinks = [
-  "Privacy Policy",
-  "Terms of Carriage",
-  "International Visas",
-  "GDPR Compliance"
-];
 
 const purchaseOptions: Array<{
   type: PurchaseType;
@@ -810,11 +804,11 @@ function SiteFooter() {
         <div className="flex flex-wrap justify-center gap-6">
           {footerLinks.map((link) => (
             <a
-              key={link}
+              key={link.href}
               className="font-label text-xs uppercase tracking-[0.14em] text-slate-500 underline underline-offset-4 transition-colors hover:text-slate-800"
-              href="#"
+              href={link.href}
             >
-              {link}
+              {link.label}
             </a>
           ))}
         </div>

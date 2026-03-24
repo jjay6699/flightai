@@ -17,15 +17,9 @@ import { loadSelectedDeparture, loadSelectedReturn, savePassenger } from "@/lib/
 import { formatDate, formatDuration, formatTime } from "@/lib/flight-utils";
 import { CabinClassOption, getCabinOptionsForTrip } from "@/lib/cabin";
 import { fetchAirlineMeta } from "@/lib/airline-meta";
+import { footerLinks } from "@/lib/footer-links";
 
 type AirportNames = { name?: string | null; city?: string | null; country?: string | null };
-
-const footerLinks = [
-  "Privacy Policy",
-  "Terms of Carriage",
-  "International Visas",
-  "GDPR Compliance"
-];
 
 async function fetchAirlineName(code: string) {
   const data = await fetchAirlineMeta(code);
@@ -468,11 +462,11 @@ function SiteFooter() {
         <div className="flex flex-wrap justify-center gap-6">
           {footerLinks.map((link) => (
             <a
-              key={link}
+              key={link.href}
               className="font-label text-xs uppercase tracking-[0.14em] text-slate-500 underline underline-offset-4 transition-colors hover:text-slate-800"
-              href="#"
+              href={link.href}
             >
-              {link}
+              {link.label}
             </a>
           ))}
         </div>

@@ -1,5 +1,6 @@
 import { ArrowRight, Earth, Landmark, Plane, UserCircle2 } from "lucide-react";
 import FlightSearchForm from "@/components/FlightSearchForm";
+import { footerLinks } from "@/lib/footer-links";
 
 const featureSteps = [
   {
@@ -20,13 +21,6 @@ const featureSteps = [
     description:
       "Download as PDF, Apple Wallet, or high-res JPG directly to your device, ready for embassy printing or digital display."
   }
-];
-
-const footerLinks = [
-  "Privacy Policy",
-  "Terms of Carriage",
-  "International Visas",
-  "GDPR Compliance"
 ];
 
 export default function HomePage() {
@@ -201,15 +195,15 @@ export default function HomePage() {
             </p>
           </div>
           <div className="flex flex-wrap justify-center gap-6">
-            {footerLinks.map((link) => (
-              <a
-                key={link}
-                className="font-label text-xs uppercase tracking-[0.14em] text-slate-500 underline underline-offset-4 transition-colors hover:text-slate-800"
-                href="#"
-              >
-                {link}
-              </a>
-            ))}
+          {footerLinks.map((link) => (
+            <a
+              key={link.href}
+              className="font-label text-xs uppercase tracking-[0.14em] text-slate-500 underline underline-offset-4 transition-colors hover:text-slate-800"
+              href={link.href}
+            >
+              {link.label}
+            </a>
+          ))}
           </div>
         </div>
       </footer>

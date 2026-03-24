@@ -8,7 +8,7 @@ const { getJson } = require('serpapi');
 dotenv.config();
 
 const app = express();
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
 // Middleware
 app.use(cors());
@@ -144,6 +144,9 @@ app.get('/api/flights', async (req, res) => {
 // Create Checkout Session
 app.post('/api/create-checkout-session', async (req, res) => {
   try {
+    if (!stripe) {
+      return res.status(503).json({ error: 'Stripe is not configured' });
+    }
     const { flightId, passengerName } = req.body;
     
     const session = await stripe.checkout.sessions.create({
@@ -179,6 +182,9 @@ app.post('/api/create-checkout-session', async (req, res) => {
 // Stripe verify endpoint (simulating DB completion query)
 app.get('/api/verify-payment/:sessionId', async (req, res) => {
   try {
+    if (!stripe) {
+      return res.status(503).json({ error: 'Stripe is not configured' });
+    }
     const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
     if (session.payment_status === 'paid') {
       res.json({ success: true, metadata: session.metadata });
@@ -192,6 +198,9 @@ app.get('/api/verify-payment/:sessionId', async (req, res) => {
 
 // Stripe Webhook
 app.post('/api/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: 'Stripe is not configured' });
+  }
   const sig = req.headers['stripe-signature'];
   let event;
 

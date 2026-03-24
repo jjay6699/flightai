@@ -22,22 +22,12 @@ import ItineraryDocument from "@/components/ItineraryDocument";
 import { cacheLogoFromApi, getCachedLogo } from "@/lib/logo-cache";
 import { fetchAirlineMeta } from "@/lib/airline-meta";
 
-const pxToPt = 0.75;
-const a4WidthPt = 595.28;
-const a4HeightPt = 841.89;
-const marginPt = 36;
-
 type PassData = {
   label: string;
   segmentIndex: number;
   seat: string;
   boardingTime: string;
   qrUrl?: string | null;
-};
-
-type ExportPage = {
-  element: HTMLElement | null;
-  kind: "a4" | "fit";
 };
 
 type AirportNames = { name?: string | null; city?: string | null; country?: string | null };
@@ -122,7 +112,8 @@ export default function TicketPage() {
   const [logoMap, setLogoMap] = useState<Record<string, string>>({});
   const [entitlement, setEntitlement] = useState({
     boardingPasses: false,
-    itinerary: false
+    itinerary: false,
+    lastSessionId: ""
   });
   const [checkoutLoading, setCheckoutLoading] = useState<PurchaseType | null>(null);
   const [verificationState, setVerificationState] = useState<"idle" | "verifying" | "success" | "error">("idle");
@@ -147,7 +138,8 @@ export default function TicketPage() {
     if (existingEntitlement) {
       setEntitlement({
         boardingPasses: existingEntitlement.boardingPasses,
-        itinerary: existingEntitlement.itinerary
+        itinerary: existingEntitlement.itinerary,
+        lastSessionId: existingEntitlement.lastSessionId || ""
       });
     }
 
@@ -231,11 +223,13 @@ export default function TicketPage() {
       .then((payload) => {
         const nextEntitlement = {
           boardingPasses: Boolean(payload.access?.boardingPasses),
-          itinerary: Boolean(payload.access?.itinerary)
+          itinerary: Boolean(payload.access?.itinerary),
+          lastSessionId: sessionId
         };
         setEntitlement((current) => ({
           boardingPasses: current.boardingPasses || nextEntitlement.boardingPasses,
-          itinerary: current.itinerary || nextEntitlement.itinerary
+          itinerary: current.itinerary || nextEntitlement.itinerary,
+          lastSessionId: sessionId
         }));
         saveBookingEntitlement(passenger.bookingRef, {
           ...nextEntitlement,
@@ -288,7 +282,8 @@ export default function TicketPage() {
         body: JSON.stringify({
           bookingRef: passenger.bookingRef,
           passengerName: buildFullName(passenger),
-          purchaseType
+          purchaseType,
+          ticketData: ticketPayload
         })
       });
       const payload = await response.json();
@@ -301,48 +296,6 @@ export default function TicketPage() {
       setPaymentMessage(checkoutError instanceof Error ? checkoutError.message : "Unable to start checkout.");
       setCheckoutLoading(null);
     }
-  }
-
-  async function downloadElements(pages: ExportPage[], filename: string) {
-    const validPages = pages.filter((page): page is { element: HTMLElement; kind: "a4" | "fit" } => Boolean(page.element));
-    if (!validPages.length) return;
-    const html2canvas = (await import("html2canvas")).default;
-    const { jsPDF } = await import("jspdf");
-
-    const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-
-    for (let index = 0; index < validPages.length; index += 1) {
-      const { element, kind } = validPages[index];
-      const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
-      const imgData = canvas.toDataURL("image/png");
-
-      if (index > 0) {
-        pdf.addPage();
-      }
-
-      if (kind === "a4") {
-        pdf.addImage(imgData, "PNG", 0, 0, a4WidthPt, a4HeightPt);
-      } else {
-        const widthPt = canvas.width * pxToPt * 0.5;
-        const heightPt = canvas.height * pxToPt * 0.5;
-        const scale = Math.min((a4WidthPt - marginPt * 2) / widthPt, (a4HeightPt - marginPt * 2) / heightPt);
-        const renderWidth = widthPt * scale;
-        const renderHeight = heightPt * scale;
-        const x = (a4WidthPt - renderWidth) / 2;
-        const y = (a4HeightPt - renderHeight) / 2;
-        pdf.addImage(imgData, "PNG", x, y, renderWidth, renderHeight);
-      }
-    }
-
-    pdf.save(filename);
-  }
-
-  function getItineraryPages(): ExportPage[] {
-    if (!itineraryRef.current) return [];
-    return Array.from(itineraryRef.current.querySelectorAll("[data-itinerary-page]")).map((element) => ({
-      element: element as HTMLElement,
-      kind: "a4" as const
-    }));
   }
 
   if (error) {
@@ -387,6 +340,34 @@ export default function TicketPage() {
   const canDownloadBoarding = entitlement.boardingPasses;
   const canDownloadItinerary = entitlement.itinerary;
   const canDownloadBundle = canDownloadBoarding && canDownloadItinerary;
+  const ticketPayload = {
+    passenger,
+    segments,
+    issueDate,
+    totalFare,
+    airlineNames: airlineNamesByIndex,
+    passes: passes.map((item) => ({
+      label: item.label,
+      seat: item.seat,
+      boardingTime: item.boardingTime
+    })),
+    airportNames: segments.reduce<Record<number, { departure?: SegmentMeta["departureAirport"]; arrival?: SegmentMeta["arrivalAirport"] }>>((acc, _segment, index) => {
+      acc[index] = {
+        departure: segmentMeta[index]?.departureAirport,
+        arrival: segmentMeta[index]?.arrivalAirport
+      };
+      return acc;
+    }, {})
+  };
+
+  function downloadSecureAsset(type: "bundle" | "boarding_passes" | "itinerary") {
+    if (!passenger || !entitlement.lastSessionId) {
+      setPaymentMessage("A verified checkout session is required before downloading. Complete payment again if this booking was unlocked on another device.");
+      return;
+    }
+    const url = `/api/payments/download/${encodeURIComponent(entitlement.lastSessionId)}?bookingRef=${encodeURIComponent(passenger.bookingRef)}&type=${encodeURIComponent(type)}`;
+    window.location.href = url;
+  }
 
   return (
     <>
@@ -568,27 +549,21 @@ export default function TicketPage() {
 
                 <div className="mt-6 space-y-3 border-t border-slate-100 pt-6">
                   <button
-                    onClick={() => downloadElements([
-                      ...getItineraryPages(),
-                      ...passes.map((item) => ({ element: passRefs.current[item.segmentIndex], kind: "fit" as const }))
-                    ], `FlightAI-${passenger.bookingRef}-ticket-pack.pdf`)}
+                    onClick={() => downloadSecureAsset("bundle")}
                     disabled={!canDownloadBundle}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-black px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     {canDownloadBundle ? "Download boarding passes + itinerary" : "Unlock both to download pack"}
                   </button>
                   <button
-                    onClick={() => downloadElements(
-                      passes.map((item) => ({ element: passRefs.current[item.segmentIndex], kind: "fit" as const })),
-                      `FlightAI-${passenger.bookingRef}-boarding-passes.pdf`
-                    )}
+                    onClick={() => downloadSecureAsset("boarding_passes")}
                     disabled={!canDownloadBoarding}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     {canDownloadBoarding ? "Download boarding passes" : "Unlock boarding passes first"}
                   </button>
                   <button
-                    onClick={() => downloadElements(getItineraryPages(), `FlightAI-${passenger.bookingRef}-itinerary.pdf`)}
+                    onClick={() => downloadSecureAsset("itinerary")}
                     disabled={!canDownloadItinerary}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-45"
                   >

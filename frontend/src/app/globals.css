@@ -31,6 +31,92 @@ body {
     radial-gradient(circle at 70% 92%, rgba(15, 23, 42, 0.1), transparent 40%);
 }
 
+@keyframes heroDrift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2%, -3%, 0) scale(1.06);
+  }
+  100% {
+    transform: translate3d(-1%, 2%, 0) scale(1.02);
+  }
+}
+
+@keyframes heroPulse {
+  0% {
+    opacity: 0.45;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.72;
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 0.52;
+    transform: scale(1);
+  }
+}
+
+.hero-ambient {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.hero-ambient::before,
+.hero-ambient::after {
+  content: "";
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  will-change: transform, opacity;
+}
+
+.hero-ambient::before {
+  top: 6%;
+  left: -8%;
+  width: 30rem;
+  height: 30rem;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(177, 196, 255, 0.32) 0%, rgba(177, 196, 255, 0.14) 36%, transparent 68%);
+  animation: heroDrift 18s ease-in-out infinite alternate;
+}
+
+.hero-ambient::after {
+  right: -6%;
+  bottom: 10%;
+  width: 34rem;
+  height: 34rem;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(226, 195, 131, 0.2) 0%, rgba(194, 214, 255, 0.18) 34%, transparent 72%);
+  animation: heroPulse 16s ease-in-out infinite alternate;
+}
+
+.hero-ambient-glow {
+  position: absolute;
+  left: 50%;
+  top: 16%;
+  width: min(72rem, 88vw);
+  height: 28rem;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.45) 38%, rgba(218, 226, 253, 0.22) 62%, transparent 85%);
+  filter: blur(34px);
+  opacity: 0.9;
+  animation: heroDrift 24s ease-in-out infinite alternate-reverse;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-ambient::before,
+  .hero-ambient::after,
+  .hero-ambient-glow {
+    animation: none;
+  }
+}
+
 .glass-card {
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(24px);

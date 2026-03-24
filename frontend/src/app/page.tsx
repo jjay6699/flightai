@@ -54,7 +54,9 @@ export default function HomePage() {
       <main className="pt-24">
         <section id="hero" className="relative flex min-h-[921px] flex-col items-center justify-center overflow-hidden px-4 sm:px-6 md:px-8">
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_120%,rgba(226,195,131,0.14),transparent_50%)]" />
-          <div className="absolute -right-20 top-1/4 -z-10 h-96 w-96 rounded-full bg-[#dae2fd]/40 blur-[120px]" />
+          <div className="hero-ambient -z-10" />
+          <div className="hero-ambient-glow -z-10" />
+          <div className="absolute -right-20 top-1/4 -z-10 h-96 w-96 rounded-full bg-[#dae2fd]/30 blur-[120px]" />
           <div className="w-full max-w-5xl text-center">
             <div className="mb-8 inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200/60 bg-[#f0f4f8] px-4 py-1.5">
               <span className="h-2 w-2 rounded-full bg-[#e2c383]" />

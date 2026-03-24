@@ -1,0 +1,73 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Manrope:wght@200;300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  color: #171c1f;
+  background: #f6fafe;
+}
+
+.bg-mesh {
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(14, 165, 233, 0.12), transparent 40%),
+    radial-gradient(circle at 88% 10%, rgba(59, 130, 246, 0.14), transparent 35%),
+    radial-gradient(circle at 70% 92%, rgba(15, 23, 42, 0.1), transparent 40%);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(18px);
+}
+
+.text-gradient {
+  background: linear-gradient(to right, #000000, #45464d);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.input {
+  @apply w-full rounded-2xl border border-line bg-white/90 px-4 py-3 text-sm text-ink shadow-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full bg-ink/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-ink/70;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.92);
+  @apply rounded-3xl border border-line p-6 shadow-lift transition hover:-translate-y-1 hover:shadow-glass;
+}
+
+.shimmer {
+  background: linear-gradient(90deg, rgba(244, 246, 251, 0.6) 0%, rgba(226, 232, 240, 0.6) 50%, rgba(244, 246, 251, 0.6) 100%);
+  background-size: 200% 100%;
+}

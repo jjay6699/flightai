@@ -22,12 +22,22 @@ import ItineraryDocument from "@/components/ItineraryDocument";
 import { cacheLogoFromApi, getCachedLogo } from "@/lib/logo-cache";
 import { fetchAirlineMeta } from "@/lib/airline-meta";
 
+const pxToPt = 0.75;
+const a4WidthPt = 595.28;
+const a4HeightPt = 841.89;
+const marginPt = 36;
+
 type PassData = {
   label: string;
   segmentIndex: number;
   seat: string;
   boardingTime: string;
   qrUrl?: string | null;
+};
+
+type ExportPage = {
+  element: HTMLElement | null;
+  kind: "a4" | "fit";
 };
 
 type AirportNames = { name?: string | null; city?: string | null; country?: string | null };
@@ -298,6 +308,48 @@ export default function TicketPage() {
     }
   }
 
+  async function downloadElements(pages: ExportPage[], filename: string) {
+    const validPages = pages.filter((page): page is { element: HTMLElement; kind: "a4" | "fit" } => Boolean(page.element));
+    if (!validPages.length) return;
+    const html2canvas = (await import("html2canvas")).default;
+    const { jsPDF } = await import("jspdf");
+
+    const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+
+    for (let index = 0; index < validPages.length; index += 1) {
+      const { element, kind } = validPages[index];
+      const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+      const imgData = canvas.toDataURL("image/png");
+
+      if (index > 0) {
+        pdf.addPage();
+      }
+
+      if (kind === "a4") {
+        pdf.addImage(imgData, "PNG", 0, 0, a4WidthPt, a4HeightPt);
+      } else {
+        const widthPt = canvas.width * pxToPt * 0.5;
+        const heightPt = canvas.height * pxToPt * 0.5;
+        const scale = Math.min((a4WidthPt - marginPt * 2) / widthPt, (a4HeightPt - marginPt * 2) / heightPt);
+        const renderWidth = widthPt * scale;
+        const renderHeight = heightPt * scale;
+        const x = (a4WidthPt - renderWidth) / 2;
+        const y = (a4HeightPt - renderHeight) / 2;
+        pdf.addImage(imgData, "PNG", x, y, renderWidth, renderHeight);
+      }
+    }
+
+    pdf.save(filename);
+  }
+
+  function getItineraryPages(): ExportPage[] {
+    if (!itineraryRef.current) return [];
+    return Array.from(itineraryRef.current.querySelectorAll("[data-itinerary-page]")).map((element) => ({
+      element: element as HTMLElement,
+      kind: "a4" as const
+    }));
+  }
+
   if (error) {
     return (
       <>
@@ -365,8 +417,24 @@ export default function TicketPage() {
       setPaymentMessage("A verified checkout session is required before downloading. Complete payment again if this booking was unlocked on another device.");
       return;
     }
-    const url = `/api/payments/download/${encodeURIComponent(entitlement.lastSessionId)}?bookingRef=${encodeURIComponent(passenger.bookingRef)}&type=${encodeURIComponent(type)}`;
-    window.location.href = url;
+
+    if (type === "bundle") {
+      downloadElements([
+        ...getItineraryPages(),
+        ...passes.map((item) => ({ element: passRefs.current[item.segmentIndex], kind: "fit" as const }))
+      ], `FlightAI-${passenger.bookingRef}-ticket-pack.pdf`);
+      return;
+    }
+
+    if (type === "boarding_passes") {
+      downloadElements(
+        passes.map((item) => ({ element: passRefs.current[item.segmentIndex], kind: "fit" as const })),
+        `FlightAI-${passenger.bookingRef}-boarding-passes.pdf`
+      );
+      return;
+    }
+
+    downloadElements(getItineraryPages(), `FlightAI-${passenger.bookingRef}-itinerary.pdf`);
   }
 
   return (

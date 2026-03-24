@@ -25,10 +25,10 @@ const featureSteps = [
 
 export default function HomePage() {
   return (
-    <>
-      <nav className="fixed inset-x-0 top-0 z-50 border-b border-slate-200/50 bg-white/80 px-6 py-4 shadow-sm shadow-slate-200/40 backdrop-blur-xl md:px-8">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-          <div className="font-headline text-2xl font-extrabold tracking-[-0.06em] text-slate-950">FlightAI</div>
+    <div className="overflow-x-clip">
+      <nav className="fixed inset-x-0 top-0 z-50 border-b border-slate-200/50 bg-white/80 px-4 py-4 shadow-sm shadow-slate-200/40 backdrop-blur-xl sm:px-6 md:px-8">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 sm:gap-4">
+          <div className="min-w-0 font-headline text-2xl font-extrabold tracking-[-0.06em] text-slate-950">FlightAI</div>
           <div className="hidden items-center gap-8 md:flex">
             <a className="border-b-2 border-slate-950 pb-1 font-headline text-sm font-semibold tracking-tight text-slate-950" href="#hero">
               Overview
@@ -43,8 +43,8 @@ export default function HomePage() {
               Contact
             </a>
           </div>
-          <div className="flex items-center gap-4">
-            <button className="rounded-full bg-black px-6 py-2.5 font-headline text-sm font-semibold text-white transition hover:opacity-90 active:scale-95">
+          <div className="flex shrink-0 items-center gap-3 sm:gap-4">
+            <button className="rounded-full bg-black px-4 py-2 text-xs font-headline font-semibold whitespace-nowrap text-white transition hover:opacity-90 active:scale-95 sm:px-6 sm:py-2.5 sm:text-sm">
               Book Now
             </button>
           </div>
@@ -52,13 +52,13 @@ export default function HomePage() {
       </nav>
 
       <main className="pt-24">
-        <section id="hero" className="relative flex min-h-[921px] flex-col items-center justify-center px-6 md:px-8">
+        <section id="hero" className="relative flex min-h-[921px] flex-col items-center justify-center overflow-hidden px-4 sm:px-6 md:px-8">
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_120%,rgba(226,195,131,0.14),transparent_50%)]" />
           <div className="absolute -right-20 top-1/4 -z-10 h-96 w-96 rounded-full bg-[#dae2fd]/40 blur-[120px]" />
           <div className="w-full max-w-5xl text-center">
-            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-slate-200/60 bg-[#f0f4f8] px-4 py-1.5">
+            <div className="mb-8 inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200/60 bg-[#f0f4f8] px-4 py-1.5">
               <span className="h-2 w-2 rounded-full bg-[#e2c383]" />
-              <span className="font-label text-xs font-semibold uppercase tracking-[0.22em] text-slate-600">
+              <span className="font-label text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600 sm:text-xs sm:tracking-[0.22em]">
                 Global Standard Onward Travel
               </span>
             </div>
@@ -83,7 +83,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section id="standards" className="mx-auto max-w-7xl px-8 py-32">
+        <section id="standards" className="mx-auto max-w-7xl px-4 py-24 sm:px-6 md:px-8 md:py-32">
           <div className="grid h-auto grid-cols-1 gap-6 md:h-[600px] md:grid-cols-12">
             <div className="group relative overflow-hidden rounded-xl md:col-span-8">
               <img
@@ -129,8 +129,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section id="services" className="py-32">
-          <div className="mx-auto max-w-7xl px-8">
+        <section id="services" className="py-24 md:py-32">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8">
             <div className="mb-24 flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
               <div className="max-w-xl">
                 <h2 className="mb-6 font-headline text-4xl font-bold tracking-tight">Designed for the Modern Traveler</h2>
@@ -157,8 +157,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="mx-auto mb-32 max-w-7xl px-8">
-          <div className="relative overflow-hidden rounded-xl bg-[#131b2e] px-8 py-16 text-center md:px-24 md:py-24">
+        <section className="mx-auto mb-24 max-w-7xl px-4 sm:px-6 md:mb-32 md:px-8">
+          <div className="relative overflow-hidden rounded-xl bg-[#131b2e] px-6 py-12 text-center sm:px-8 md:px-24 md:py-24">
             <div className="absolute inset-0 -z-10 opacity-20">
               <img
                 className="h-full w-full object-cover"
@@ -174,10 +174,10 @@ export default function HomePage() {
                 Join over 50,000+ digital nomads and travelers who trust FlightAI for their visa travel documentation.
               </p>
               <div className="flex flex-col justify-center gap-4 sm:flex-row">
-                <button className="rounded-xl bg-white px-10 py-4 font-headline font-bold text-[#131b2e] transition hover:bg-white/90">
+                <button className="w-full rounded-xl bg-white px-6 py-4 font-headline font-bold text-[#131b2e] transition hover:bg-white/90 sm:w-auto sm:px-10">
                   Book Your First Pass
                 </button>
-                <button className="rounded-xl border border-white/20 bg-white/10 px-10 py-4 font-headline font-bold text-white transition hover:bg-white/20">
+                <button className="w-full rounded-xl border border-white/20 bg-white/10 px-6 py-4 font-headline font-bold text-white transition hover:bg-white/20 sm:w-auto sm:px-10">
                   Contact Sales
                 </button>
               </div>
@@ -186,7 +186,7 @@ export default function HomePage() {
         </section>
       </main>
 
-      <footer id="contact" className="border-t border-slate-200/50 bg-[#f6fafe] px-6 py-12 md:px-8">
+      <footer id="contact" className="border-t border-slate-200/50 bg-[#f6fafe] px-4 py-12 sm:px-6 md:px-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 md:flex-row">
           <div className="flex flex-col items-center gap-2 md:items-start">
             <div className="font-headline text-lg font-black uppercase tracking-[-0.05em] text-slate-900">FlightAI</div>
@@ -207,7 +207,7 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
-    </>
+    </div>
   );
 }
 

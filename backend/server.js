@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 const Stripe = require('stripe');
 const axios = require('axios');
 const { getJson } = require('serpapi');
-const { generateTicketPdf } = require('./pdf-generator');
+const { chromium } = require('playwright');
 
 dotenv.config();
 
@@ -262,7 +262,7 @@ app.get('/api/verify-payment/:sessionId', async (req, res) => {
   }
 });
 
-app.get('/api/download/:sessionId', async (req, res) => {
+app.get('/api/ticket-data/:sessionId', async (req, res) => {
   try {
     if (!stripe) {
       return res.status(503).json({ error: 'Stripe is not configured' });
@@ -298,18 +298,97 @@ app.get('/api/download/:sessionId', async (req, res) => {
       return res.status(404).json({ error: 'Ticket data is no longer available. Start a new checkout for this booking.' });
     }
 
-    const pdfBuffer = await generateTicketPdf({
-      type: normalizedType,
+    return res.json({
       bookingRef: String(bookingRef),
-      ticketData: stored.ticketData
+      ticketData: stored.ticketData,
+      access: {
+        boardingPasses: allowsBoarding,
+        itinerary: allowsItinerary
+      }
     });
-    const suffix = normalizedType === 'bundle' ? 'ticket-pack' : normalizedType;
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="FlightAI-${bookingRef}-${suffix}.pdf"`);
-    return res.send(pdfBuffer);
   } catch (error) {
     return res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/download/:sessionId', async (req, res) => {
+  let browser;
+
+  try {
+    if (!stripe) {
+      return res.status(503).json({ error: 'Stripe is not configured' });
+    }
+
+    const { bookingRef, type } = req.query;
+    if (!bookingRef || !type) {
+      return res.status(400).json({ error: 'bookingRef and type are required' });
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
+    const metadata = session.metadata || {};
+    if (session.payment_status !== 'paid') {
+      return res.status(402).json({ error: 'Payment is not completed for this session' });
+    }
+    if (metadata.bookingRef !== bookingRef) {
+      return res.status(400).json({ error: 'Booking reference does not match session' });
+    }
+
+    const allowsBoarding = metadata.access_boarding === 'true';
+    const allowsItinerary = metadata.access_itinerary === 'true';
+    const normalizedType = String(type);
+    if (
+      (normalizedType === 'boarding_passes' && !allowsBoarding) ||
+      (normalizedType === 'itinerary' && !allowsItinerary) ||
+      (normalizedType === 'bundle' && !(allowsBoarding && allowsItinerary))
+    ) {
+      return res.status(403).json({ error: 'This purchase does not grant access to that file' });
+    }
+
+    const stored = getTicketPayload(String(bookingRef));
+    if (!stored?.ticketData) {
+      return res.status(404).json({ error: 'Ticket data is no longer available. Start a new checkout for this booking.' });
+    }
+
+    const frontendBaseUrl = process.env.CLIENT_URL;
+    if (!frontendBaseUrl) {
+      return res.status(500).json({ error: 'CLIENT_URL is not configured' });
+    }
+
+    browser = await chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    const page = await browser.newPage({
+      viewport: { width: 794, height: 1123 },
+      deviceScaleFactor: 2
+    });
+    const printUrl = `${frontendBaseUrl}/ticket/print?sessionId=${encodeURIComponent(req.params.sessionId)}&bookingRef=${encodeURIComponent(String(bookingRef))}&type=${encodeURIComponent(normalizedType)}`;
+    await page.goto(printUrl, { waitUntil: 'networkidle' });
+    await page.waitForSelector('[data-print-ready="true"]', { timeout: 45000 });
+    await page.waitForTimeout(800);
+
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      preferCSSPageSize: true,
+      margin: {
+        top: '0',
+        right: '0',
+        bottom: '0',
+        left: '0'
+      }
+    });
+
+    const suffix = normalizedType === 'bundle' ? 'ticket-pack' : normalizedType;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="FlightAI-${bookingRef}-${suffix}.pdf"`);
+    return res.send(Buffer.from(pdfBuffer));
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
   }
 });
 

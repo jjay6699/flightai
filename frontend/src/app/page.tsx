@@ -29,7 +29,7 @@ export default function HomePage() {
     <div className="overflow-x-clip">
       <nav className="fixed inset-x-0 top-0 z-50 border-b border-slate-200/50 bg-white/80 px-4 py-4 shadow-sm shadow-slate-200/40 backdrop-blur-xl sm:px-6 md:px-8">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 sm:gap-4">
-          <BrandLogo priority className="h-8 sm:h-9" />
+          <BrandLogo className="h-8 sm:h-9" />
           <div className="hidden items-center gap-8 md:flex">
             <a className="border-b-2 border-slate-950 pb-1 font-headline text-sm font-semibold tracking-tight text-slate-950" href="#hero">
               Overview

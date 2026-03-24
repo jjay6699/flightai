@@ -446,21 +446,23 @@ export default function TicketPage() {
                   Issued for {fullName}
                 </h2>
 
+                <div className="mt-6 rounded-[1.6rem] bg-[#131b2e] p-5 text-white">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/60">Total fare</p>
+                      <p className="mt-3 font-headline text-4xl font-bold tracking-[-0.05em]">{totalFare}</p>
+                      <p className="mt-2 text-sm leading-6 text-white/60">
+                        Combined ticket estimate for selected segment{segments.length > 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <CheckCircle2 className="h-6 w-6 text-[#e2c383]" strokeWidth={2.2} />
+                  </div>
+                </div>
+
                 <div className="mt-6 grid gap-4 rounded-[1.6rem] border border-slate-200/80 bg-[#fbfcfe] p-5">
                   <MiniStat icon={UserRound} label="Passenger" value={fullName} />
                   <MiniStat icon={ShieldCheck} label="Cabin" value={passenger.cabinClass ?? "Economy"} />
                   <MiniStat icon={TicketIcon} label="Booking Ref" value={passenger.bookingRef} />
-                </div>
-
-                <div className="mt-6 rounded-[1.6rem] bg-[#131b2e] p-5 text-white">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/60">Total fare</p>
-                  <div className="mt-3 flex items-end justify-between gap-4">
-                    <div>
-                      <p className="font-headline text-4xl font-bold tracking-[-0.05em]">{totalFare}</p>
-                      <p className="mt-2 text-sm text-white/60">Combined ticket estimate for selected segment{segments.length > 1 ? "s" : ""}</p>
-                    </div>
-                    <CheckCircle2 className="h-6 w-6 text-[#e2c383]" strokeWidth={2.2} />
-                  </div>
                 </div>
               </div>
 
@@ -504,8 +506,21 @@ export default function TicketPage() {
                   )}
                 </div>
 
-                <div className="mt-6 space-y-3">
-                  {purchaseOptions.map((option) => {
+                <div className="mt-6 rounded-[1.6rem] border border-slate-200 bg-[#fbfcfe] p-4">
+                  <div className="flex items-end justify-between gap-4 border-b border-slate-200 pb-4">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                        Pricing
+                      </p>
+                      <h4 className="mt-2 font-headline text-xl font-bold tracking-[-0.04em] text-slate-900">
+                        Choose your access
+                      </h4>
+                    </div>
+                    <p className="text-xs font-medium text-slate-500">One-time payment</p>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    {purchaseOptions.map((option) => {
                     const unlocked =
                       option.type === "bundle_both"
                         ? canDownloadBundle
@@ -518,18 +533,31 @@ export default function TicketPage() {
                         key={option.type}
                         onClick={() => startCheckout(option.type)}
                         disabled={unlocked || checkoutLoading !== null || verificationState === "verifying"}
-                        className={`w-full rounded-[1.4rem] border px-5 py-4 text-left transition ${
+                        className={`w-full rounded-[1.4rem] border px-4 py-4 text-left transition ${
                           option.type === "bundle_both"
-                            ? "border-slate-950 bg-slate-950 text-white"
-                            : "border-slate-200 bg-white text-slate-800"
+                            ? "border-slate-950 bg-slate-950 text-white shadow-[0_18px_35px_rgba(15,23,42,0.18)]"
+                            : "border-slate-200 bg-white text-slate-800 hover:border-slate-300"
                         } disabled:cursor-not-allowed disabled:opacity-60`}
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div>
-                            <p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${option.type === "bundle_both" ? "text-white/60" : "text-slate-400"}`}>
-                              {unlocked ? "Unlocked" : option.priceLabel}
-                            </p>
-                            <p className="mt-2 text-sm font-semibold uppercase tracking-[0.16em]">{option.title}</p>
+                            <div className="flex items-center gap-3">
+                              <span className={`text-2xl font-black tracking-[-0.05em] ${option.type === "bundle_both" ? "text-white" : "text-slate-950"}`}>
+                                {option.priceLabel}
+                              </span>
+                              <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
+                                unlocked
+                                  ? option.type === "bundle_both"
+                                    ? "bg-white/12 text-white/70"
+                                    : "bg-emerald-50 text-emerald-700"
+                                  : option.type === "bundle_both"
+                                    ? "bg-white/12 text-white/70"
+                                    : "bg-slate-100 text-slate-500"
+                              }`}>
+                                {unlocked ? "Unlocked" : option.type === "bundle_both" ? "Most popular" : "Single access"}
+                              </span>
+                            </div>
+                            <p className="mt-3 text-sm font-semibold uppercase tracking-[0.16em]">{option.title}</p>
                             <p className={`mt-2 text-sm leading-6 ${option.type === "bundle_both" ? "text-white/70" : "text-slate-500"}`}>
                               {unlocked ? "Already available for this booking reference." : option.description}
                             </p>
@@ -544,7 +572,8 @@ export default function TicketPage() {
                         </div>
                       </button>
                     );
-                  })}
+                    })}
+                  </div>
                 </div>
 
                 <div className="mt-6 space-y-3 border-t border-slate-100 pt-6">

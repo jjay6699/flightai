@@ -384,6 +384,7 @@ app.get('/api/download/:sessionId', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="FlightAI-${bookingRef}-${suffix}.pdf"`);
     return res.send(Buffer.from(pdfBuffer));
   } catch (error) {
+    console.error('Download generation failed:', error);
     return res.status(500).json({ error: error.message });
   } finally {
     if (browser) {

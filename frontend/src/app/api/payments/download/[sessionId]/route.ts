@@ -12,11 +12,24 @@ export async function GET(
     cache: "no-store"
   });
 
-  return new Response(response.body, {
-    status: response.status,
+  if (!response.ok) {
+    const text = await response.text();
+    return new Response(text || JSON.stringify({ error: "Download failed" }), {
+      status: response.status,
+      headers: {
+        "Content-Type": response.headers.get("content-type") ?? "application/json"
+      }
+    });
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return new Response(arrayBuffer, {
+    status: 200,
     headers: {
       "Content-Type": response.headers.get("content-type") ?? "application/pdf",
-      "Content-Disposition": response.headers.get("content-disposition") ?? "attachment"
+      "Content-Disposition": response.headers.get("content-disposition") ?? "attachment; filename=\"download.pdf\"",
+      "Content-Length": String(arrayBuffer.byteLength),
+      "Cache-Control": "no-store"
     }
   });
 }

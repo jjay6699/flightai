@@ -44,3 +44,8 @@ export type TicketDetails = {
   seat: string;
   boardingTime: string;
 };
+
+export type PurchaseType =
+  | "boarding_passes_only"
+  | "itinerary_only"
+  | "bundle_both";

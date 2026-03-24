@@ -9,6 +9,23 @@ dotenv.config();
 
 const app = express();
 const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_KEY) : null;
+const purchaseCatalog = {
+  boarding_passes_only: {
+    priceEnv: 'STRIPE_PRICE_BOARDING',
+    label: 'Boarding passes only',
+    amount: 1500
+  },
+  itinerary_only: {
+    priceEnv: 'STRIPE_PRICE_ITINERARY',
+    label: 'Itinerary only',
+    amount: 1500
+  },
+  bundle_both: {
+    priceEnv: 'STRIPE_PRICE_BUNDLE',
+    label: 'Boarding passes + itinerary',
+    amount: 2000
+  }
+};
 
 // Middleware
 app.use(cors());
@@ -27,19 +44,19 @@ async function fetchSerpApiFlights(origin, destination) {
 
   try {
     const params = {
-      engine: "google_flights",
+      engine: 'google_flights',
       departure_id: origin.toUpperCase(),
       arrival_id: destination.toUpperCase(),
-      outbound_date: new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0], // Default to 7 days out
-      currency: "USD",
-      hl: "en",
+      outbound_date: new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0],
+      currency: 'USD',
+      hl: 'en',
       api_key: apiKey
     };
 
     const response = await getJson(params);
     const flights = response.best_flights || response.other_flights || [];
-    
-    return flights.slice(0, 5).map(flight => {
+
+    return flights.slice(0, 5).map((flight) => {
       const leg = flight.flights[0];
       const departureTime = new Date(leg.departure_airport.time);
       const arrivalTime = new Date(leg.arrival_airport.time);
@@ -84,22 +101,19 @@ function generateRealisticFlights(origin, destination) {
 
   const results = [];
   const now = new Date();
-  
-  // Generate 3-5 realistic options
-  for (let i = 0; i < 4; i++) {
+
+  for (let i = 0; i < 4; i += 1) {
     const airline = airlines[Math.floor(Math.random() * airlines.length)];
     const flightNumber = `${airline.code}${Math.floor(100 + Math.random() * 899)}`;
-    const departureTime = new Date(now.getTime() + (Math.random() * 86400000 * 7)); // Within next 7 days
-    
-    // Simulate realistic flight duration (average 3-12 hours for international)
+    const departureTime = new Date(now.getTime() + Math.random() * 86400000 * 7);
     const durationHours = Math.floor(4 + Math.random() * 10);
     const durationMins = Math.floor(Math.random() * 60);
-    const arrivalTime = new Date(departureTime.getTime() + (durationHours * 3600000) + (durationMins * 60000));
+    const arrivalTime = new Date(departureTime.getTime() + durationHours * 3600000 + durationMins * 60000);
 
     results.push({
       id: `SIM-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
       airline: airline.name,
-      flightNumber: flightNumber,
+      flightNumber,
       departure: {
         iata: origin.toUpperCase(),
         time: departureTime.toISOString(),
@@ -111,13 +125,12 @@ function generateRealisticFlights(origin, destination) {
         terminal: String(Math.floor(Math.random() * 5) + 1)
       },
       duration: `${durationHours}h ${durationMins}m`,
-      price: 299.99 + (Math.random() * 150)
+      price: 299.99 + Math.random() * 150
     });
   }
   return results;
 }
 
-// Optimized Flight API Endpoint
 app.get('/api/flights', async (req, res) => {
   try {
     const { origin, destination } = req.query;
@@ -125,10 +138,8 @@ app.get('/api/flights', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Origin and destination are required' });
     }
 
-    // Try real data first via SerpApi
     let flights = await fetchSerpApiFlights(origin, destination);
-    
-    // Fallback to simulator if SerpApi fails, has no key, or returns no results
+
     if (!flights || flights.length === 0) {
       console.log('Using Simulator Fallback for:', origin, '->', destination);
       flights = generateRealisticFlights(origin, destination);
@@ -141,66 +152,99 @@ app.get('/api/flights', async (req, res) => {
   }
 });
 
-// Create Checkout Session
 app.post('/api/create-checkout-session', async (req, res) => {
   try {
     if (!stripe) {
       return res.status(503).json({ error: 'Stripe is not configured' });
     }
-    const { flightId, passengerName } = req.body;
-    
+
+    const { bookingRef, passengerName, purchaseType } = req.body;
+    const selection = purchaseCatalog[purchaseType];
+
+    if (!bookingRef || !purchaseType || !selection) {
+      return res.status(400).json({ error: 'bookingRef and a valid purchaseType are required' });
+    }
+
+    const priceId = process.env[selection.priceEnv];
+    if (!priceId) {
+      return res.status(503).json({ error: `${selection.priceEnv} is not configured` });
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `Dummy Flight Ticket - ${flightId}`,
-              description: `Realistic dummy ticket for ${passengerName || 'Passenger'}`,
-            },
-            unit_amount: 500, // $5.00
-          },
-          quantity: 1,
-        },
+          price: priceId,
+          quantity: 1
+        }
       ],
       mode: 'payment',
-      success_url: `${process.env.CLIENT_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.CLIENT_URL}/`,
+      success_url: `${process.env.CLIENT_URL}/ticket?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.CLIENT_URL}/ticket?checkout=cancelled`,
       metadata: {
-        flightId,
-        passengerName
+        bookingRef,
+        passengerName: passengerName || '',
+        purchaseType,
+        access_boarding: String(purchaseType === 'boarding_passes_only' || purchaseType === 'bundle_both'),
+        access_itinerary: String(purchaseType === 'itinerary_only' || purchaseType === 'bundle_both')
+      },
+      payment_intent_data: {
+        metadata: {
+          bookingRef,
+          purchaseType
+        }
       }
     });
 
-    res.json({ id: session.id });
+    res.json({
+      id: session.id,
+      url: session.url,
+      purchaseType,
+      label: selection.label,
+      amount: selection.amount
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Stripe verify endpoint (simulating DB completion query)
 app.get('/api/verify-payment/:sessionId', async (req, res) => {
   try {
     if (!stripe) {
       return res.status(503).json({ error: 'Stripe is not configured' });
     }
+
     const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
-    if (session.payment_status === 'paid') {
-      res.json({ success: true, metadata: session.metadata });
-    } else {
-      res.json({ success: false });
+    const bookingRef = req.query.bookingRef;
+    const metadata = session.metadata || {};
+
+    if (!bookingRef || metadata.bookingRef !== bookingRef) {
+      return res.status(400).json({ success: false, error: 'Booking reference does not match session' });
     }
+
+    if (session.payment_status === 'paid') {
+      return res.json({
+        success: true,
+        paymentStatus: session.payment_status,
+        metadata,
+        access: {
+          boardingPasses: metadata.access_boarding === 'true',
+          itinerary: metadata.access_itinerary === 'true'
+        }
+      });
+    }
+
+    return res.json({ success: false, paymentStatus: session.payment_status });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
-// Stripe Webhook
 app.post('/api/webhook', express.raw({ type: 'application/json' }), (req, res) => {
   if (!stripe) {
     return res.status(503).json({ error: 'Stripe is not configured' });
   }
+
   const sig = req.headers['stripe-signature'];
   let event;
 
@@ -208,9 +252,10 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), (req, res) =
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     if (webhookSecret && sig) {
       event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-    } else {
-      // Fallback for dev if secret not provided
+    } else if (process.env.NODE_ENV === 'development') {
       event = JSON.parse(req.body);
+    } else {
+      throw new Error('Webhook secret is required outside development');
     }
   } catch (err) {
     console.error(`Webhook Error: ${err.message}`);
@@ -219,13 +264,13 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), (req, res) =
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
-    console.log('✅ Payment successful for session:', session.id);
+    console.log('Payment successful for session:', session.id);
     console.log('Passenger:', session.metadata.passengerName);
-    console.log('Flight ID:', session.metadata.flightId);
-    // In a real app, you'd save this to a database or trigger ticket generation here
+    console.log('Booking reference:', session.metadata.bookingRef);
+    console.log('Purchase type:', session.metadata.purchaseType);
   }
 
-  res.json({ received: true });
+  return res.json({ received: true });
 });
 
 const PORT = process.env.PORT || 3001;

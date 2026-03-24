@@ -5,14 +5,17 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   CheckCircle2,
+  CreditCard,
   Download,
+  LoaderCircle,
+  LockKeyhole,
   PlaneTakeoff,
   ShieldCheck,
   Ticket as TicketIcon,
   UserRound
 } from "lucide-react";
-import { FlightOffer, PassengerDetails, FlightSegment } from "@/lib/types";
-import { loadPassenger, loadSelectedDeparture, loadSelectedReturn, clearSession } from "@/lib/storage";
+import { FlightOffer, PassengerDetails, FlightSegment, PurchaseType } from "@/lib/types";
+import { loadPassenger, loadSelectedDeparture, loadSelectedReturn, clearSession, loadBookingEntitlement, saveBookingEntitlement } from "@/lib/storage";
 import { formatDate, formatTime, generateBoardingTime, generateSeat } from "@/lib/flight-utils";
 import BoardingPassCard from "@/components/BoardingPassCard";
 import ItineraryDocument from "@/components/ItineraryDocument";
@@ -53,6 +56,32 @@ const footerLinks = [
   "GDPR Compliance"
 ];
 
+const purchaseOptions: Array<{
+  type: PurchaseType;
+  title: string;
+  priceLabel: string;
+  description: string;
+}> = [
+  {
+    type: "bundle_both",
+    title: "Unlock boarding passes + itinerary",
+    priceLabel: "$20",
+    description: "Best value. Removes watermarks and enables every export."
+  },
+  {
+    type: "boarding_passes_only",
+    title: "Unlock boarding passes",
+    priceLabel: "$15",
+    description: "Removes the pass watermark and enables QR-ready boarding pass downloads."
+  },
+  {
+    type: "itinerary_only",
+    title: "Unlock itinerary only",
+    priceLabel: "$15",
+    description: "Removes the itinerary watermark and enables A4 itinerary export."
+  }
+];
+
 function buildFullName(details: PassengerDetails) {
   return [details.firstName, details.middleName, details.lastName].filter(Boolean).join(" ").trim();
 }
@@ -91,6 +120,13 @@ export default function TicketPage() {
   const [passes, setPasses] = useState<PassData[]>([]);
   const [segmentMeta, setSegmentMeta] = useState<Record<number, SegmentMeta>>({});
   const [logoMap, setLogoMap] = useState<Record<string, string>>({});
+  const [entitlement, setEntitlement] = useState({
+    boardingPasses: false,
+    itinerary: false
+  });
+  const [checkoutLoading, setCheckoutLoading] = useState<PurchaseType | null>(null);
+  const [verificationState, setVerificationState] = useState<"idle" | "verifying" | "success" | "error">("idle");
+  const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const passRefs = useRef<Array<HTMLDivElement | null>>([]);
   const itineraryRef = useRef<HTMLDivElement | null>(null);
@@ -107,6 +143,13 @@ export default function TicketPage() {
     setDeparture(selectedDeparture);
     setReturn(selectedReturn);
     setPassenger(passengerData);
+    const existingEntitlement = loadBookingEntitlement(passengerData.bookingRef);
+    if (existingEntitlement) {
+      setEntitlement({
+        boardingPasses: existingEntitlement.boardingPasses,
+        itinerary: existingEntitlement.itinerary
+      });
+    }
 
     const segments: FlightSegment[] = [selectedDeparture.segments[0]];
     if (selectedReturn?.segments[0]) {
@@ -121,18 +164,6 @@ export default function TicketPage() {
     }));
 
     setPasses(passData);
-
-    import("qrcode").then((QRCode) => {
-      Promise.all(
-        segments.map((segment) =>
-          QRCode.toDataURL(
-            `PASS|${passengerData.bookingRef}|${segment.departureIata}|${segment.arrivalIata}|${segment.departureTime}`
-          )
-        )
-      ).then((urls) => {
-        setPasses((prev) => prev.map((item, idx) => ({ ...item, qrUrl: urls[idx] })));
-      });
-    });
 
     Promise.all(
       segments.map(async (segment, index) => {
@@ -169,6 +200,108 @@ export default function TicketPage() {
       setLogoMap(next);
     });
   }, []);
+
+  useEffect(() => {
+    if (!departure || !passenger) return;
+
+    const sessionId = new URLSearchParams(window.location.search).get("session_id");
+    const checkoutState = new URLSearchParams(window.location.search).get("checkout");
+
+    if (checkoutState === "cancelled") {
+      setPaymentMessage("Checkout was cancelled. Your previews are still available and the documents stay locked until payment is completed.");
+      window.history.replaceState({}, "", "/ticket");
+      return;
+    }
+
+    if (!sessionId) return;
+
+    setVerificationState("verifying");
+    setPaymentMessage("Verifying your Stripe test payment.");
+
+    fetch(`/api/payments/verify-payment/${encodeURIComponent(sessionId)}?bookingRef=${encodeURIComponent(passenger.bookingRef)}`, {
+      cache: "no-store"
+    })
+      .then(async (res) => {
+        const payload = await res.json();
+        if (!res.ok || !payload.success) {
+          throw new Error(payload.error || "Payment verification failed");
+        }
+        return payload;
+      })
+      .then((payload) => {
+        const nextEntitlement = {
+          boardingPasses: Boolean(payload.access?.boardingPasses),
+          itinerary: Boolean(payload.access?.itinerary)
+        };
+        setEntitlement((current) => ({
+          boardingPasses: current.boardingPasses || nextEntitlement.boardingPasses,
+          itinerary: current.itinerary || nextEntitlement.itinerary
+        }));
+        saveBookingEntitlement(passenger.bookingRef, {
+          ...nextEntitlement,
+          lastSessionId: sessionId
+        });
+        setVerificationState("success");
+        setPaymentMessage("Payment confirmed. Your documents are now unlocked for this booking.");
+        window.history.replaceState({}, "", "/ticket");
+      })
+      .catch((verificationError) => {
+        setVerificationState("error");
+        setPaymentMessage(verificationError instanceof Error ? verificationError.message : "Unable to verify payment.");
+        window.history.replaceState({}, "", "/ticket");
+      });
+  }, [departure, passenger]);
+
+  useEffect(() => {
+    if (!departure || !passenger) return;
+
+    if (!entitlement.boardingPasses) {
+      setPasses((current) => current.map((item) => ({ ...item, qrUrl: undefined })));
+      return;
+    }
+
+    const segments: FlightSegment[] = [departure.segments[0], ...(ret?.segments[0] ? [ret.segments[0]] : [])];
+    import("qrcode").then((QRCode) => {
+      Promise.all(
+        segments.map((segment) =>
+          QRCode.toDataURL(
+            `PASS|${passenger.bookingRef}|${segment.departureIata}|${segment.arrivalIata}|${segment.departureTime}`
+          )
+        )
+      ).then((urls) => {
+        setPasses((prev) => prev.map((item, idx) => ({ ...item, qrUrl: urls[idx] })));
+      });
+    });
+  }, [departure, ret, passenger, entitlement.boardingPasses]);
+
+  async function startCheckout(purchaseType: PurchaseType) {
+    if (!passenger) return;
+    setCheckoutLoading(purchaseType);
+    setPaymentMessage(null);
+
+    try {
+      const response = await fetch("/api/payments/create-checkout-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          bookingRef: passenger.bookingRef,
+          passengerName: buildFullName(passenger),
+          purchaseType
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.error || "Unable to start Stripe checkout");
+      }
+
+      window.location.href = payload.url;
+    } catch (checkoutError) {
+      setPaymentMessage(checkoutError instanceof Error ? checkoutError.message : "Unable to start checkout.");
+      setCheckoutLoading(null);
+    }
+  }
 
   async function downloadElements(pages: ExportPage[], filename: string) {
     const validPages = pages.filter((page): page is { element: HTMLElement; kind: "a4" | "fit" } => Boolean(page.element));
@@ -251,6 +384,9 @@ export default function TicketPage() {
     acc[index] = segmentMeta[index]?.airlineName ?? segment.carrierCode;
     return acc;
   }, {});
+  const canDownloadBoarding = entitlement.boardingPasses;
+  const canDownloadItinerary = entitlement.itinerary;
+  const canDownloadBundle = canDownloadBoarding && canDownloadItinerary;
 
   return (
     <>
@@ -288,7 +424,7 @@ export default function TicketPage() {
                   />
                   <InfoPanel
                     label="Ticket Status"
-                    value="Ready to download"
+                    value={canDownloadBundle ? "Fully unlocked" : canDownloadBoarding || canDownloadItinerary ? "Partially unlocked" : "Payment required"}
                     tone="dark"
                   />
                 </div>
@@ -354,36 +490,109 @@ export default function TicketPage() {
                       Downloads
                     </p>
                     <h3 className="mt-2 font-headline text-2xl font-bold tracking-[-0.04em] text-slate-900">
-                      Export passes
+                      Unlock exports
                     </h3>
                   </div>
                   <Download className="h-5 w-5 text-slate-400" strokeWidth={2} />
                 </div>
 
+                <div className="mt-5 rounded-[1.4rem] border border-slate-200 bg-[#f7f9fc] p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    Access status
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {canDownloadBundle
+                      ? "All documents are unlocked. Downloads below will export the clean versions."
+                      : "Previews stay watermarked until Stripe confirms payment. QR codes and downloads unlock only for paid items."}
+                  </p>
+                  {paymentMessage && (
+                    <div className={`mt-3 rounded-2xl px-4 py-3 text-sm ${
+                      verificationState === "error"
+                        ? "bg-rose-50 text-rose-600"
+                        : verificationState === "success"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-white text-slate-600"
+                    }`}>
+                      {verificationState === "verifying" && (
+                        <span className="mr-2 inline-flex align-middle">
+                          <LoaderCircle className="h-4 w-4 animate-spin" strokeWidth={2.2} />
+                        </span>
+                      )}
+                      {paymentMessage}
+                    </div>
+                  )}
+                </div>
+
                 <div className="mt-6 space-y-3">
+                  {purchaseOptions.map((option) => {
+                    const unlocked =
+                      option.type === "bundle_both"
+                        ? canDownloadBundle
+                        : option.type === "boarding_passes_only"
+                          ? canDownloadBoarding
+                          : canDownloadItinerary;
+
+                    return (
+                      <button
+                        key={option.type}
+                        onClick={() => startCheckout(option.type)}
+                        disabled={unlocked || checkoutLoading !== null || verificationState === "verifying"}
+                        className={`w-full rounded-[1.4rem] border px-5 py-4 text-left transition ${
+                          option.type === "bundle_both"
+                            ? "border-slate-950 bg-slate-950 text-white"
+                            : "border-slate-200 bg-white text-slate-800"
+                        } disabled:cursor-not-allowed disabled:opacity-60`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${option.type === "bundle_both" ? "text-white/60" : "text-slate-400"}`}>
+                              {unlocked ? "Unlocked" : option.priceLabel}
+                            </p>
+                            <p className="mt-2 text-sm font-semibold uppercase tracking-[0.16em]">{option.title}</p>
+                            <p className={`mt-2 text-sm leading-6 ${option.type === "bundle_both" ? "text-white/70" : "text-slate-500"}`}>
+                              {unlocked ? "Already available for this booking reference." : option.description}
+                            </p>
+                          </div>
+                          {checkoutLoading === option.type ? (
+                            <LoaderCircle className={`mt-1 h-5 w-5 animate-spin ${option.type === "bundle_both" ? "text-white" : "text-slate-500"}`} strokeWidth={2.2} />
+                          ) : unlocked ? (
+                            <CheckCircle2 className={`mt-1 h-5 w-5 ${option.type === "bundle_both" ? "text-[#e2c383]" : "text-emerald-600"}`} strokeWidth={2.2} />
+                          ) : (
+                            <CreditCard className={`mt-1 h-5 w-5 ${option.type === "bundle_both" ? "text-white" : "text-slate-500"}`} strokeWidth={2.2} />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-6 space-y-3 border-t border-slate-100 pt-6">
                   <button
                     onClick={() => downloadElements([
                       ...getItineraryPages(),
                       ...passes.map((item) => ({ element: passRefs.current[item.segmentIndex], kind: "fit" as const }))
                     ], `FlightAI-${passenger.bookingRef}-ticket-pack.pdf`)}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-black px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:-translate-y-0.5"
+                    disabled={!canDownloadBundle}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-black px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    Download boarding passes + itinerary
+                    {canDownloadBundle ? "Download boarding passes + itinerary" : "Unlock both to download pack"}
                   </button>
                   <button
                     onClick={() => downloadElements(
                       passes.map((item) => ({ element: passRefs.current[item.segmentIndex], kind: "fit" as const })),
                       `FlightAI-${passenger.bookingRef}-boarding-passes.pdf`
                     )}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:border-slate-300"
+                    disabled={!canDownloadBoarding}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    Download boarding passes
+                    {canDownloadBoarding ? "Download boarding passes" : "Unlock boarding passes first"}
                   </button>
                   <button
                     onClick={() => downloadElements(getItineraryPages(), `FlightAI-${passenger.bookingRef}-itinerary.pdf`)}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:border-slate-300"
+                    disabled={!canDownloadItinerary}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    Download itinerary only
+                    {canDownloadItinerary ? "Download itinerary only" : "Unlock itinerary first"}
                   </button>
                 </div>
 
@@ -426,6 +635,7 @@ export default function TicketPage() {
                           )
                         }}
                         logoUrl={logoMap[segments[item.segmentIndex].carrierCode]}
+                        locked={!canDownloadBoarding}
                       />
                     </div>
                   ))}
@@ -459,6 +669,7 @@ export default function TicketPage() {
                         };
                         return acc;
                       }, {})}
+                      locked={!canDownloadItinerary}
                     />
                   </div>
                 </div>

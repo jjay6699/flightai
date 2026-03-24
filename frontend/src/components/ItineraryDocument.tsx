@@ -40,7 +40,8 @@ export default function ItineraryDocument({
   airportNames,
   airlineNames,
   passes,
-  totalFare
+  totalFare,
+  locked = false
 }: {
   bookingRef: string;
   passenger: PassengerDetails;
@@ -50,6 +51,7 @@ export default function ItineraryDocument({
   airlineNames: Record<number, string | null | undefined>;
   passes: PassMeta[];
   totalFare: string;
+  locked?: boolean;
 }) {
   const fullName = buildFullName(passenger);
   const importantNotes = [
@@ -63,7 +65,7 @@ export default function ItineraryDocument({
 
   return (
     <div className="flex w-[794px] flex-col gap-6">
-      <div data-itinerary-page className="h-[1123px] w-[794px] overflow-hidden bg-white px-8 py-8 text-slate-800 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <div data-itinerary-page className="relative h-[1123px] w-[794px] overflow-hidden bg-white px-8 py-8 text-slate-800 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
         <div className="flex items-start justify-between gap-6">
           <div>
             <img src="/itinerary-logo.svg" alt="Itinerary logo" className="h-12 w-auto object-contain" />
@@ -179,9 +181,11 @@ export default function ItineraryDocument({
             <InfoCell label="Document" value={passenger.passportNumber || "Not provided"} />
           </div>
         </section>
+
+        {locked && <WatermarkOverlay />}
       </div>
 
-      <div data-itinerary-page className="h-[1123px] w-[794px] overflow-hidden bg-white px-8 py-8 text-slate-800 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <div data-itinerary-page className="relative h-[1123px] w-[794px] overflow-hidden bg-white px-8 py-8 text-slate-800 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
         <section>
           <h3 className="text-base font-semibold text-slate-900">Important Information</h3>
           <ul className="mt-2.5 space-y-1.5 text-[12px] leading-5 text-slate-600">
@@ -193,8 +197,23 @@ export default function ItineraryDocument({
             ))}
           </ul>
         </section>
+
+        {locked && <WatermarkOverlay />}
       </div>
     </div>
+  );
+}
+
+function WatermarkOverlay() {
+  return (
+    <>
+      <div className="pointer-events-none absolute inset-0 bg-white/10 backdrop-blur-[1px]" />
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
+        <div className="rotate-[-18deg] text-center text-[58px] font-black uppercase tracking-[0.32em] text-slate-900/10">
+          Unpaid Preview
+        </div>
+      </div>
+    </>
   );
 }
 

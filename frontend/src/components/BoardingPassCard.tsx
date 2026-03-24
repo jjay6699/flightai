@@ -69,7 +69,8 @@ export default function BoardingPassCard({
   qrUrl,
   airlineName,
   airportNames,
-  logoUrl
+  logoUrl,
+  locked = false
 }: {
   label: string;
   segment: FlightSegment;
@@ -81,6 +82,7 @@ export default function BoardingPassCard({
   airlineName?: string | null;
   airportNames?: { departure?: string | null; arrival?: string | null };
   logoUrl?: string | null;
+  locked?: boolean;
 }) {
   const [logoIndex, setLogoIndex] = useState(0);
   const [cachedLogoUrl, setCachedLogoUrl] = useState<string | null>(() => getCachedLogo(segment.carrierCode));
@@ -119,7 +121,7 @@ export default function BoardingPassCard({
   }, [segment.carrierCode]);
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-line bg-white shadow-lift">
+    <div className="relative overflow-hidden rounded-3xl border border-line bg-white shadow-lift">
       <div className="flex items-center justify-between px-6 py-3 text-white" style={{ backgroundColor: brand.primary }}>
         <div className="text-xs font-semibold uppercase tracking-[0.3em]">Boarding Pass</div>
         <div className="text-xs font-semibold uppercase tracking-[0.35em]">{bookingRef}</div>
@@ -228,14 +230,16 @@ export default function BoardingPassCard({
 
           <div className="flex min-h-[220px] flex-col rounded-2xl border border-dashed border-line bg-slate-50 p-3" style={{ borderColor: brand.soft }}>
             <div className="flex flex-1 items-center justify-center rounded-2xl border border-line bg-white p-3">
-              {qrUrl ? (
+              {!locked && qrUrl ? (
                 <img src={qrUrl} alt="QR" className="h-36 w-36 max-h-[150px] max-w-[150px]" />
               ) : (
-                <div className="h-36 w-36 max-h-[150px] max-w-[150px]" />
+                <div className="flex h-36 w-36 max-h-[150px] max-w-[150px] items-center justify-center rounded-2xl bg-slate-100 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                  {locked ? "Paid access required" : ""}
+                </div>
               )}
             </div>
             <div className="mt-2 text-center text-[10px] uppercase tracking-[0.2em] text-slate-400">
-              Scan for boarding
+              {locked ? "QR unlocks after payment" : "Scan for boarding"}
             </div>
           </div>
 
@@ -281,6 +285,17 @@ export default function BoardingPassCard({
         <span>{label}</span>
         <span>Boarding closes 15 minutes before departure</span>
       </div>
+
+      {locked && (
+        <>
+          <div className="pointer-events-none absolute inset-0 bg-white/18 backdrop-blur-[1.5px]" />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
+            <div className="rotate-[-18deg] text-center text-[52px] font-black uppercase tracking-[0.35em] text-slate-900/12">
+              Unpaid Preview
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

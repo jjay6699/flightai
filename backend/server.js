@@ -13,17 +13,14 @@ const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_
 const ticketPayloadStore = new Map();
 const purchaseCatalog = {
   boarding_passes_only: {
-    priceEnv: 'STRIPE_PRICE_BOARDING',
     label: 'Boarding passes only',
     amount: 1500
   },
   itinerary_only: {
-    priceEnv: 'STRIPE_PRICE_ITINERARY',
     label: 'Itinerary only',
     amount: 1500
   },
   bundle_both: {
-    priceEnv: 'STRIPE_PRICE_BUNDLE',
     label: 'Boarding passes + itinerary',
     amount: 2000
   }
@@ -182,16 +179,18 @@ app.post('/api/create-checkout-session', async (req, res) => {
       return res.status(400).json({ error: 'bookingRef, valid purchaseType, and ticketData are required' });
     }
 
-    const priceId = process.env[selection.priceEnv];
-    if (!priceId) {
-      return res.status(503).json({ error: `${selection.priceEnv} is not configured` });
-    }
-
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price: priceId,
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: selection.label,
+              description: `FlightAI document access for booking ${bookingRef}`
+            },
+            unit_amount: selection.amount
+          },
           quantity: 1
         }
       ],

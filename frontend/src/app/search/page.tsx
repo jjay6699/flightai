@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, PlaneTakeoff } from "lucide-react";
 import FlightCard from "@/components/FlightCard";
@@ -17,6 +17,14 @@ const footerLinks = [
 ];
 
 export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f6fafe]" />}>
+      <SearchPageContent />
+    </Suspense>
+  );
+}
+
+function SearchPageContent() {
   const searchParams = useSearchParams() ?? new URLSearchParams();
   const router = useRouter();
   const [offers, setOffers] = useState<FlightOffer[]>([]);

@@ -1,3 +1,4 @@
+import BrandLogo from "@/components/BrandLogo";
 import { footerLinks } from "@/lib/footer-links";
 
 export default function InfoPageShell({
@@ -15,8 +16,8 @@ export default function InfoPageShell({
     <>
       <nav className="fixed inset-x-0 top-0 z-50 border-b border-slate-200/50 bg-white/80 px-6 py-4 shadow-sm shadow-slate-200/40 backdrop-blur-xl md:px-8">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-          <a className="font-headline text-2xl font-extrabold tracking-[-0.06em] text-slate-950" href="/">
-            FlightAI
+          <a href="/">
+            <BrandLogo className="h-8 sm:h-9" />
           </a>
           <div className="hidden items-center gap-8 md:flex">
             <a className="font-headline text-sm font-medium tracking-tight text-slate-500 transition hover:text-slate-800" href="/">
@@ -82,7 +83,7 @@ export default function InfoPageShell({
       <footer className="border-t border-slate-200/50 bg-[#f6fafe] px-6 py-12 md:px-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 md:flex-row">
           <div className="flex flex-col items-center gap-2 md:items-start">
-            <div className="font-headline text-lg font-black uppercase tracking-[-0.05em] text-slate-900">FlightAI</div>
+            <BrandLogo className="h-7" />
             <p className="font-label text-xs uppercase tracking-[0.14em] text-slate-500">
               © 2026 FlightAI Global. Member of Star Alliance. All rights reserved.
             </p>
